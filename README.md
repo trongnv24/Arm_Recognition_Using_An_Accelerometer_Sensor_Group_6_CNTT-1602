@@ -1,0 +1,1 @@
+# Arm_Recognition_Using_An_Accelerometer_Sensor_Group_6_CNTT-1602
