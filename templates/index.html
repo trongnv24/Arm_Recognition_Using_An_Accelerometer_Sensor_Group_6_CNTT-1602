@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dự đoán cử chỉ - Dashboard</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 0; 
+            padding: 20px; 
+            background-color: #f8f9fa;
+        }
+        .container { 
+            max-width: 1200px; 
+            margin: 0 auto; 
+            display: flex; 
+        }
+        .left-panel { 
+            flex: 1; 
+            margin-right: 20px; 
+        }
+        .right-panel { 
+            flex: 1; 
+        }
+        .card { 
+            border: 1px solid #ddd; 
+            border-radius: 8px; 
+            padding: 15px; 
+            margin-bottom: 20px; 
+            background-color: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1, h2 { 
+            margin-top: 0; 
+            color: #333;
+        }
+        .prediction { 
+            font-size: 24px; 
+            font-weight: bold; 
+            margin-bottom: 10px;
+        }
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-top: 10px;
+        }
+        table, th, td { 
+            border: 1px solid #ddd; 
+        }
+        th, td { 
+            padding: 8px; 
+            text-align: left; 
+        }
+        th { 
+            background-color: #f2f2f2; 
+            font-weight: bold;
+        }
+        .current-data { 
+            padding: 10px; 
+            background-color: #f9f9f9; 
+            border-radius: 5px; 
+            margin-bottom: 15px; 
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+        .current-data div {
+            padding: 4px;
+        }
+        .current-data div:nth-child(odd) {
+            background-color: #f0f0f0;
+            border-radius: 4px;
+        }
+        .btn-group { 
+            margin-top: 15px; 
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        button { 
+            padding: 10px 15px; 
+            cursor: pointer; 
+            border: none;
+            border-radius: 4px;
+            font-weight: bold;
+            transition: background-color 0.2s;
+        }
+        .btn-primary { 
+            background-color: #4CAF50; 
+            color: white; 
+        }
+        .btn-primary:hover {
+            background-color: #3e8e41;
+        }
+        .btn-secondary { 
+            background-color: #f44336; 
+            color: white; 
+        }
+        .btn-secondary:hover {
+            background-color: #d32f2f;
+        }
+        .btn-info { 
+            background-color: #2196F3; 
+            color: white; 
+        }
+        .btn-info:hover {
+            background-color: #0b7dda;
+        }
+        .collection-status { 
+            padding: 10px; 
+            margin-top: 10px; 
+            border-radius: 4px; 
+            font-weight: bold;
+            text-align: center;
+        }
+        .collecting { 
+            background-color: #ffeb3b; 
+            color: #333;
+        }
+        .not-collecting { 
+            background-color: #e0e0e0; 
+            color: #666;
+        }
+        .chart-container { 
+            width: 100%; 
+            height: 350px; 
+            margin-top: 20px; 
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-right: 20px;
+        }
+        .color-box {
+            display: inline-block;
+            width: 15px;
+            height: 15px;
+            margin-right: 5px;
+        }
+        .legend-container {
+            display: flex;
+            margin-top: 20px;
+            justify-content: center;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="left-panel">
+            <h1>Dự đoán cử chỉ - Dashboard</h1>
+            
+            <div class="card">
+                <h2>Kết quả dự đoán hiện tại</h2>
+                <div class="prediction">Cử chỉ: <span id="current-gesture">Đang tải...</span></div>
+                <div>Độ tin cậy: <span id="confidence">0.00%</span></div>
+                <div>Số mẫu trong buffer: <span id="buffer-size">0</span></div>
+                <div>Số mẫu đã nhận: <span id="samples-received">0</span></div>
+                <div>Thời gian cập nhật: <span id="time">-</span></div>
+                
+                <div class="collection-status not-collecting" id="collection-status">Không thu thập dữ liệu</div>
+                <div id="collection-time" style="text-align: center; margin-top: 5px;"></div>
+                
+                <div class="btn-group">
+                    <button onclick="startCollection()" id="startCollectionBtn" class="btn-primary">Bắt đầu thu thập</button>
+                    <button onclick="stopCollectionAndPredict()" id="stopCollectionBtn" class="btn-secondary" disabled>Dừng và dự đoán</button>
+                    <button onclick="resetStats()" class="btn-info">Reset thống kê</button>
+                    <button onclick="clearBuffer()" id="clearBufferBtn" class="btn-info">Xóa buffer</button>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2>Dữ liệu cảm biến hiện tại</h2>
+                <div id="current-data" class="current-data">Đang tải...</div>
+            </div>
+            
+            <div class="card">
+                <h2>Thống kê dự đoán</h2>
+                <div id="stats-data">Đang tải...</div>
+            </div>
+        </div>
+        
+        <div class="right-panel">
+            <div class="card" style="height: calc(100% - 40px);">
+                <h2>Biểu đồ MPU6050 (X, Y, Z)</h2>
+                <div class="chart-container">
+                    <canvas id="mpu-chart"></canvas>
+                </div>
+                <div class="legend-container">
+                    <div class="legend-item">
+                        <span class="color-box" style="background-color: red;"></span>
+                        <span>X</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="color-box" style="background-color: green;"></span>
+                        <span>Y</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="color-box" style="background-color: blue;"></span>
+                        <span>Z</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/static/script.js"></script>
+</body>
+</html>

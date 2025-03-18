@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Điều Khiển Slide Bằng Cử Chỉ</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    
+    .header {
+      background-color: #4CAF50;
+      color: white;
+      padding: 15px;
+      border-radius: 5px;
+      margin-bottom: 20px;
+    }
+    
+    .control-panel {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+    
+    .gesture-panel {
+      margin-top: 20px;
+      border: 1px solid #ddd;
+      padding: 15px;
+      border-radius: 5px;
+    }
+    
+    .gesture-buttons {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-top: 15px;
+    }
+    
+    button {
+      padding: 10px 15px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    
+    button:hover {
+      background-color: #45a049;
+    }
+    
+    button.control-btn {
+      background-color: #2196F3;
+    }
+    
+    button.control-btn:hover {
+      background-color: #0b7dda;
+    }
+    
+    button.gesture-btn {
+      padding: 15px;
+    }
+    
+    .status-panel {
+      margin-top: 20px;
+      padding: 15px;
+      background-color: #f8f9fa;
+      border-radius: 5px;
+    }
+    
+    pre {
+      background-color: #f5f5f5;
+      padding: 10px;
+      border-radius: 5px;
+      overflow-x: auto;
+    }
+    
+    .connection-status {
+      display: flex;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+    
+    .status-indicator {
+      width: 15px;
+      height: 15px;
+      border-radius: 50%;
+      background-color: #ff0000;
+      margin-right: 10px;
+    }
+    
+    .status-indicator.connected {
+      background-color: #00ff00;
+    }
+    
+    .device-panel {
+      margin-top: 20px;
+      border: 1px solid #ddd;
+      padding: 15px;
+      border-radius: 5px;
+    }
+    
+    .device-list {
+      margin-top: 10px;
+    }
+    
+    .device-list table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    
+    .device-list th, .device-list td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: left;
+    }
+    
+    .device-list th {
+      background-color: #f2f2f2;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Điều Khiển Slide Bằng Cử Chỉ</h1>
+  </div>
+  
+  <div class="connection-status">
+    <div id="status-indicator" class="status-indicator"></div>
+    <span id="status-text">Đang kiểm tra kết nối...</span>
+  </div>
+  
+  <div class="control-panel">
+    <button id="startBtn" class="control-btn">Bắt đầu Thu Thập</button>
+    <button id="stopBtn" class="control-btn">Dừng và Dự Đoán</button>
+    <button id="clearBtn" class="control-btn">Xóa Buffer</button>
+    <button id="refreshDevicesBtn" class="control-btn">Làm mới thiết bị</button>
+  </div>
+  
+  <div class="gesture-panel">
+    <h2>Mô phỏng cử chỉ</h2>
+    <p>Nhấn nút để gửi lệnh tương ứng với cử chỉ:</p>
+    
+    <div class="gesture-buttons">
+      <button class="gesture-btn" data-gesture="1">1: Sang Phải</button>
+      <button class="gesture-btn" data-gesture="2">2: Sang Trái</button>
+      <button class="gesture-btn" data-gesture="3">3: Lên Trên</button>
+      <button class="gesture-btn" data-gesture="4">4: Xuống Dưới</button>
+    </div>
+  </div>
+  
+  <div class="device-panel">
+    <h2>Thiết bị đã kết nối</h2>
+    <div class="device-list">
+      <table id="deviceTable">
+        <thead>
+          <tr>
+            <th>ID Thiết bị</th>
+            <th>Địa chỉ IP</th>
+            <th>Thời gian hoạt động</th>
+          </tr>
+        </thead>
+        <tbody id="deviceTableBody">
+          <tr>
+            <td colspan="3">Đang tải danh sách thiết bị...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  
+  <div class="status-panel">
+    <h2>Trạng thái hệ thống</h2>
+    <pre id="statusOutput">Đang tải thông tin...</pre>
+  </div>
+  
+  <script>
+    // Khởi tạo các biến
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const refreshDevicesBtn = document.getElementById('refreshDevicesBtn');
+    const statusOutput = document.getElementById('statusOutput');
+    const statusIndicator = document.getElementById('status-indicator');
+    const statusText = document.getElementById('status-text');
+    const gestureButtons = document.querySelectorAll('.gesture-btn');
+    const deviceTableBody = document.getElementById('deviceTableBody');
+    
+    // URL cơ sở của server
+    const baseUrl = window.location.protocol + '//' + window.location.hostname + ':' + window.location.port;
+    
+    // Kiểm tra kết nối server
+    async function checkServerStatus() {
+      try {
+        const response = await fetch(`${baseUrl}/status`);
+        const data = await response.json();
+        
+        if (response.ok) {
+          statusIndicator.classList.add('connected');
+          statusText.textContent = 'Kết nối máy chủ: OK';
+          updateStatusOutput(data);
+          return true;
+        } else {
+          statusIndicator.classList.remove('connected');
+          statusText.textContent = 'Lỗi kết nối máy chủ!';
+          return false;
+        }
+      } catch (error) {
+        statusIndicator.classList.remove('connected');
+        statusText.textContent = 'Lỗi kết nối máy chủ: ' + error.message;
+        return false;
+      }
+    }
+    
+    // Cập nhật thông tin trạng thái
+    function updateStatusOutput(data) {
+      statusOutput.textContent = JSON.stringify(data, null, 2);
+    }
+    
+    // Bắt đầu thu thập dữ liệu
+    async function startCollection() {
+      try {
+        const response = await fetch(`${baseUrl}/start-collection`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        const data = await response.json();
+        alert('Đã bắt đầu thu thập dữ liệu');
+        updateStatusOutput(data);
+      } catch (error) {
+        alert('Lỗi: ' + error.message);
+      }
+    }
+    
+    // Dừng thu thập và dự đoán
+    async function stopAndPredict() {
+      try {
+        const response = await fetch(`${baseUrl}/stop-collection-and-predict`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        const data = await response.json();
+        alert(`Kết quả dự đoán: ${data.gesture} (${data.confidence.toFixed(2)}%)`);
+        updateStatusOutput(data);
+      } catch (error) {
+        alert('Lỗi: ' + error.message);
+      }
+    }
+    
+    // Xóa buffer
+    async function clearBuffer() {
+      try {
+        const response = await fetch(`${baseUrl}/clear-buffer`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        const data = await response.json();
+        alert('Đã xóa buffer');
+        updateStatusOutput(data);
+      } catch (error) {
+        alert('Lỗi: ' + error.message);
+      }
+    }
+    
+    // Lấy danh sách thiết bị
+    async function getDevices() {
+      try {
+        const response = await fetch(`${baseUrl}/devices`);
+        const data = await response.json();
+        
+        if (response.ok) {
+          updateDeviceTable(data.devices);
+        } else {
+          console.error('Lỗi lấy danh sách thiết bị:', data);
+        }
+      } catch (error) {
+        console.error('Lỗi lấy danh sách thiết bị:', error);
+      }
+    }
+    
+    // Cập nhật bảng thiết bị
+    function updateDeviceTable(devices) {
+      // Xóa tất cả hàng hiện tại
+      deviceTableBody.innerHTML = '';
+      
+      // Kiểm tra nếu không có thiết bị
+      if (!devices || Object.keys(devices).length === 0) {
+        const row = document.createElement('tr');
+        row.innerHTML = '<td colspan="3">Không có thiết bị nào kết nối</td>';
+        deviceTableBody.appendChild(row);
+        return;
+      }
+      
+      // Thêm từng thiết bị vào bảng
+      for (const [deviceId, info] of Object.entries(devices)) {
+        const row = document.createElement('tr');
+        
+        // Tính thời gian hoạt động
+        const lastSeen = new Date(info.last_seen * 1000);
+        const now = new Date();
+        const secondsAgo = Math.floor((now - lastSeen) / 1000);
+        let timeAgo;
+        
+        if (secondsAgo < 60) {
+          timeAgo = `${secondsAgo} giây trước`;
+        } else if (secondsAgo < 3600) {
+          timeAgo = `${Math.floor(secondsAgo / 60)} phút trước`;
+        } else {
+          timeAgo = `${Math.floor(secondsAgo / 3600)} giờ trước`;
+        }
+        
+        row.innerHTML = `
+          <td>${deviceId}</td>
+          <td>${info.ip || 'N/A'}</td>
+          <td>${timeAgo}</td>
+        `;
+        
+        deviceTableBody.appendChild(row);
+      }
+    }
+    
+    // Gửi cử chỉ giả lập
+    async function sendGesture(gesture) {
+      try {
+        const response = await fetch(`${baseUrl}/send-prediction`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            gesture: gesture,
+            confidence: 95.0
+          })
+        });
+        
+        const data = await response.json();
+        alert(`Đã gửi cử chỉ: ${gesture} - ${data.message}`);
+        
+        // Cập nhật trạng thái
+        checkServerStatus();
+      } catch (error) {
+        alert('Lỗi: ' + error.message);
+      }
+    }
+    
+    // Thiết lập các event listener
+    startBtn.addEventListener('click', startCollection);
+    stopBtn.addEventListener('click', stopAndPredict);
+    clearBtn.addEventListener('click', clearBuffer);
+    refreshDevicesBtn.addEventListener('click', getDevices);
+    
+    // Thiết lập các nút cử chỉ
+    gestureButtons.forEach(button => {
+      button.addEventListener('click', () => {
+        const gesture = button.getAttribute('data-gesture');
+        sendGesture(gesture);
+      });
+    });
+    
+    // Kiểm tra trạng thái ban đầu
+    checkServerStatus();
+    
+    // Lấy danh sách thiết bị ban đầu
+    getDevices();
+    
+    // Cập nhật trạng thái và danh sách thiết bị định kỳ
+    setInterval(() => {
+      checkServerStatus();
+      getDevices();
+    }, 5000);
+  </script>
+</body>
+</html>
